@@ -91,7 +91,7 @@ function PokemonTable() {
     React.useReducer(reducer, initialState);
 
   const { isLoading, error, data, isSuccess } = useQuery(
-    ['players', queryPageIndex, queryPageSize],
+    ['pokemons', queryPageIndex, queryPageSize],
     () => fetchPokemonData(queryPageIndex, queryPageSize),
     {
       keepPreviousData: true,
