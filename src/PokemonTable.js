@@ -55,8 +55,8 @@ const trimData = (data = []) =>
   }));
 
 const initialState = {
-  page: 0,
-  pageSize: 10,
+  queryPageIndex: 0,
+  queryPageSize: 10,
   totalCount: null,
 };
 
@@ -69,12 +69,12 @@ const reducer = (state, { type, payload }) => {
     case PAGE_CHANGED:
       return {
         ...state,
-        page: payload,
+        queryPageIndex: payload,
       };
     case PAGE_SIZE_CHANGED:
       return {
         ...state,
-        pageSize: payload,
+        queryPageSize: payload,
       };
     case TOTAL_COUNT_CHANGED:
       return {
@@ -87,11 +87,12 @@ const reducer = (state, { type, payload }) => {
 };
 
 function PokemonTable() {
-  const [state, dispatch] = React.useReducer(reducer, initialState);
+  const [{ queryPageIndex, queryPageSize, totalCount }, dispatch] =
+    React.useReducer(reducer, initialState);
 
   const { isLoading, error, data, isSuccess } = useQuery(
-    ['players', state.page, state.pageSize],
-    () => fetchPokemonData(state.page, state.pageSize),
+    ['players', queryPageIndex, queryPageSize],
+    () => fetchPokemonData(queryPageIndex, queryPageSize),
     {
       keepPreviousData: true,
       staleTime: Infinity,
@@ -118,14 +119,15 @@ function PokemonTable() {
     {
       columns,
       data: isSuccess ? trimData(data.results) : [],
-      initialState: { pageIndex: state.page, pageSize: state.pageSize },
+      initialState: {
+        pageIndex: queryPageIndex,
+        pageSize: queryPageSize,
+      },
       manualPagination: true, // Tell the usePagination
       // hook that we'll handle our own data fetching
       // This means we'll also have to provide our own
       // pageCount.
-      pageCount: isSuccess
-        ? Math.ceil(state.totalCount / state.pageSize)
-        : null,
+      pageCount: isSuccess ? Math.ceil(totalCount / queryPageSize) : null,
     },
     usePagination
   );

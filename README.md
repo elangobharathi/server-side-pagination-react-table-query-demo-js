@@ -1,70 +1,148 @@
-# Getting Started with Create React App
+[React-table](https://react-table.tanstack.com/) and [react-query](https://react-query.tanstack.com/) are two awesome react libraries from [Tanner](https://github.com/tannerlinsley). They are well documented [here](https://tanstack.com/) with the examples of most use cases. Now, I am going to explain how you can leverage react-table and react-query for server side pagination.
 
-This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
+[React-table](https://react-table.tanstack.com/) is a powerful headless design so you can have full control over the render and style aspects. It gives you all the declarative hooks APIs for you to compose and conquer. In order to control the pagination, we need to use `usePagination` with `manualPagination: true`. 
 
-## Available Scripts
+[React-query](https://react-query.tanstack.com/) is a declarative and automatic server state library to fetch and cache data from your backend APIs. For our purpose, `useQuery` with `keepPreviousData` option will enable **the data from the last successful fetch available while new data is being requested, even though the query key has changed** ([For more info](https://react-query.tanstack.com/guides/paginated-queries#better-paginated-queries-with-keeppreviousdata)). 
 
-In the project directory, you can run:
+To explain further, let's consider an example of building a server side paginated table using the [Pokémon](https://pokeapi.co/) API.
 
-### `yarn start`
+```javascript
+const fetchPokemonData = async (page, pageSize) => {
+  const offset = page * pageSize;
+  try {
+    const response = await fetch(
+      `https://pokeapi.co/api/v2/pokemon?offset=${offset}&limit=${pageSize}`
+    );
+    const data = await response.json();
 
-Runs the app in the development mode.\
-Open [http://localhost:3000](http://localhost:3000) to view it in the browser.
+    return data;
+  } catch (e) {
+    throw new Error(`API error:${e?.message}`);
+  }
+};
+```
+Since Pokémon API expects offset, it's being derived from page and pageSize.
 
-The page will reload if you make edits.\
-You will also see any lint errors in the console.
 
-### `yarn test`
+```javascript
+const { isLoading, error, data, isSuccess } = useQuery(
+  ['players', queryPageIndex, queryPageSize],
+  () => fetchPokemonData(queryPageIndex, queryPageSize),
+  {
+    keepPreviousData: true,
+    staleTime: Infinity,
+  }
+);
+```
+This fetches the data as and when the query keys, which are the page and pageSize from the state change. `staleTime` is marked as infinity as we don't want to burden the Pokémon API with too many hits.
 
-Launches the test runner in the interactive watch mode.\
-See the section about [running tests](https://facebook.github.io/create-react-app/docs/running-tests) for more information.
+Now, let's bring in `useTable` hook from [react-table](https://react-table.tanstack.com/).
 
-### `yarn build`
+```javascript
+const {
+  getTableProps,
+  getTableBodyProps,
+  headerGroups,
+  prepareRow,
+  page,
+  canPreviousPage,
+  canNextPage,
+  pageOptions,
+  pageCount,
+  gotoPage,
+  nextPage,
+  previousPage,
+  setPageSize,
+  // Get the state from the instance
+  state: { pageIndex, pageSize },
+} = useTable(
+  {
+    columns,
+    data: isSuccess ? trimData(data.results) : [],
+    initialState: {
+      pageIndex: queryPageIndex,
+      pageSize: queryPageSize,
+    },
+    manualPagination: true, // Tell the usePagination
+    // hook that we'll handle our own data fetching
+    // This means we'll also have to provide our own
+    // pageCount.
+    pageCount: isSuccess ? Math.ceil(totalCount / queryPageSize) : null,
+  },
+  usePagination
+);
+```
+We are passing the `queryPageIndex` and `queryPageSize` as the initial state. When the fetch query is `isSuccess`, we pass on the `data` and the `pageCount`. Let's look at how we can keep our own state.
 
-Builds the app for production to the `build` folder.\
-It correctly bundles React in production mode and optimizes the build for the best performance.
+```javascript
+const initialState = {
+  queryPageIndex: 0,
+  queryPageSize: 10,
+  totalCount: null,
+};
 
-The build is minified and the filenames include the hashes.\
-Your app is ready to be deployed!
+const PAGE_CHANGED = 'PAGE_CHANGED';
+const PAGE_SIZE_CHANGED = 'PAGE_SIZE_CHANGED';
+const TOTAL_COUNT_CHANGED = 'TOTAL_COUNT_CHANGED';
 
-See the section about [deployment](https://facebook.github.io/create-react-app/docs/deployment) for more information.
+const reducer = (state, { type, payload }) => {
+  switch (type) {
+    case PAGE_CHANGED:
+      return {
+        ...state,
+        queryPageIndex: payload,
+      };
+    case PAGE_SIZE_CHANGED:
+      return {
+        ...state,
+        queryPageSize: payload,
+      };
+    case TOTAL_COUNT_CHANGED:
+      return {
+        ...state,
+        totalCount: payload,
+      };
+    default:
+      throw new Error(`Unhandled action type: ${type}`);
+  }
+};
 
-### `yarn eject`
+const [{ queryPageIndex, queryPageSize, totalCount }, dispatch] =
+  React.useReducer(reducer, initialState);
+```
+I am using `useReducer` in this case. As `queryPageIndex` and `queryPageSize` are being used in the `useQuery` keys, the `fetchPokemonData` is invoked when we either move to a new page or change to a new pageSize. Since we are using `staleTime: Infinity`, already visited pages with a particular page size is served from the cache for infinite time.
 
-**Note: this is a one-way operation. Once you `eject`, you can’t go back!**
+```javascript
+React.useEffect(() => {
+  dispatch({ type: PAGE_CHANGED, payload: pageIndex });
+}, [pageIndex]);
 
-If you aren’t satisfied with the build tool and configuration choices, you can `eject` at any time. This command will remove the single build dependency from your project.
+React.useEffect(() => {
+  dispatch({ type: PAGE_SIZE_CHANGED, payload: pageSize });
+  gotoPage(0);
+}, [pageSize, gotoPage]);
 
-Instead, it will copy all the configuration files and the transitive dependencies (webpack, Babel, ESLint, etc) right into your project so you have full control over them. All of the commands except `eject` will still work, but they will point to the copied scripts so you can tweak them. At this point you’re on your own.
+React.useEffect(() => {
+  if (data?.count) {
+    dispatch({
+      type: TOTAL_COUNT_CHANGED,
+      payload: data.count,
+    });
+  }
+}, [data?.count]);
+```
 
-You don’t have to ever use `eject`. The curated feature set is suitable for small and middle deployments, and you shouldn’t feel obligated to use this feature. However we understand that this tool wouldn’t be useful if you couldn’t customize it when you are ready for it.
+Here comes the interesting part where we capture `pageIndex` and `pageSize` of react-table state changes in the useEffect and dispatch to keep a copy in our local state. This is clearly duplicating them in favour of using `useQuery` in its declarative nature. There is another option to impertatively use react-query's `fetchQuery` and keep the data in the local state but you will miss the status and all other automagical stuff of `useQuery`. If you want to explore more on this topic, you can follow the reference links given at the bottom.
 
-## Learn More
 
-You can learn more in the [Create React App documentation](https://facebook.github.io/create-react-app/docs/getting-started).
 
-To learn React, check out the [React documentation](https://reactjs.org/).
+*References*:
 
-### Code Splitting
+https://github.com/tannerlinsley/react-query/discussions/736#discussioncomment-227931
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/code-splitting](https://facebook.github.io/create-react-app/docs/code-splitting)
+https://github.com/tannerlinsley/react-table/discussions/2193
 
-### Analyzing the Bundle Size
+https://github.com/tannerlinsley/react-query/discussions/1113
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size](https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size)
 
-### Making a Progressive Web App
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app](https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app)
-
-### Advanced Configuration
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/advanced-configuration](https://facebook.github.io/create-react-app/docs/advanced-configuration)
-
-### Deployment
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/deployment](https://facebook.github.io/create-react-app/docs/deployment)
-
-### `yarn build` fails to minify
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify](https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify)
+Photo by <a href="https://unsplash.com/@jwwhitt?utm_source=unsplash&utm_medium=referral&utm_content=creditCopyText">Jordan Whitt</a> on <a href="https://unsplash.com/@jwwhitt?utm_source=unsplash&utm_medium=referral&utm_content=creditCopyText">Unsplash</a>
