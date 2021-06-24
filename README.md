@@ -8,7 +8,7 @@ To explain further, let's consider an example of building a server side paginate
 
 For a seak peek of the full code: 
   * [github link](https://github.com/elangobharathi/server-side-pagination-react-table-query-demo-js)
-  * [codesandbox link](https://codesandbox.io/s/server-side-pagination-react-table-query-demo-js-x9sfb?file=/src/PokemonTable.js)
+  * [codesandbox link](https://codesandbox.io/s/server-side-pagination-react-table-query-demo-js-9wn8h?file=/src/PokemonTable.js)
 
 ```javascript
 const fetchPokemonData = async (page, pageSize) => {
@@ -387,9 +387,9 @@ export default PokemonTable;
 
 ```
 
-{% codesandbox x9sfb module=/src/PokemonTable.js %}
+{% codesandbox 9wn8h module=/src/PokemonTable.js %}
 
-[![Edit server-side-pagination-react-table-query-demo-js](https://codesandbox.io/static/img/play-codesandbox.svg)](https://codesandbox.io/s/server-side-pagination-react-table-query-demo-js-x9sfb?fontsize=14&hidenavigation=1&module=%2Fsrc%2FPokemonTable.js&theme=dark)
+[![Edit server-side-pagination-react-table-query-demo-js](https://codesandbox.io/static/img/play-codesandbox.svg)](https://codesandbox.io/s/github/elangobharathi/server-side-pagination-react-table-query-demo-js/tree/master/?fontsize=14&hidenavigation=1&theme=dark)
 
 *References*:
 
